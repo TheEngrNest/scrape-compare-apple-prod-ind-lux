@@ -1,0 +1,75 @@
+{
+  "meta": {
+    "description": "Seed list of current Apple MacBook models and variations for India (apple.com/in) vs Luxembourg (apple.com/lu) price comparison.",
+    "compiled_on": "2026-05-24",
+    "currency_reference": "USD (Apple US list price, for sanity-checking only)",
+    "regions": {
+      "india": { "store": "https://www.apple.com/in/", "currency": "INR" },
+      "luxembourg": { "store": "https://www.apple.com/lu/", "currency": "EUR" }
+    },
+    "notes": [
+      "MacBook Neo / A18 Pro tier RAM and storage figures should be confirmed against Apple's spec page before scraping.",
+      "Base M5 14-inch MacBook Pro is a late-2025 model still sold alongside the 2026 M5 Pro/Max refresh."
+    ]
+  },
+  "models": [
+    {
+      "family": "MacBook Neo",
+      "tier": "budget",
+      "announced": "2026-03-04",
+      "display": { "sizes_in": [13.0], "type": "Liquid Retina", "resolution": "2408x1506", "brightness_nits": 500, "notch": false },
+      "chips": [
+        { "name": "A18 Pro", "cpu_cores": null, "gpu_cores": null }
+      ],
+      "memory_gb": [8, 12],
+      "storage_gb": [128, 256],
+      "colors": ["Silver", "Indigo", "Blush", "Citrus"],
+      "us_price_from_usd": 599,
+      "us_price_education_usd": 499
+    },
+    {
+      "family": "MacBook Air",
+      "tier": "mainstream",
+      "announced": "2026-03-03",
+      "display": { "sizes_in": [13.6, 15.3], "type": "Liquid Retina", "brightness_nits": 500 },
+      "chips": [
+        { "name": "M5", "cpu_cores": null, "gpu_cores": null }
+      ],
+      "memory_gb": [16, 24, 32],
+      "storage_gb": [512, 1024, 2048, 4096],
+      "colors": ["Sky Blue", "Midnight", "Starlight", "Silver"],
+      "connectivity": ["N1 (Wi-Fi 7, Bluetooth 6)", "2x Thunderbolt 4", "12MP Center Stage camera"],
+      "battery_hours_up_to": 18,
+      "us_price_from_usd": { "13_inch": 1099, "15_inch": 1299 }
+    },
+    {
+      "family": "MacBook Pro",
+      "tier": "pro-entry",
+      "announced": "2025-10-15",
+      "display": { "sizes_in": [14.2], "type": "Liquid Retina XDR", "resolution": "3024x1965" },
+      "chips": [
+        { "name": "M5", "cpu_cores": 10, "gpu_cores": 10 }
+      ],
+      "memory_gb": [16, 24, 32],
+      "storage_gb": [512, 1024, 2048, 4096],
+      "colors": ["Space Black", "Silver"],
+      "us_price_from_usd": 1599
+    },
+    {
+      "family": "MacBook Pro",
+      "tier": "pro",
+      "announced": "2026-03",
+      "display": { "sizes_in": [14.2, 16.2], "type": "Liquid Retina XDR", "resolution_16in": "3456x2234", "peak_hdr_nits": 1600 },
+      "chips": [
+        { "name": "M5 Pro", "cpu_cores": 15, "gpu_cores": 16 },
+        { "name": "M5 Pro", "cpu_cores": 18, "gpu_cores": 20 },
+        { "name": "M5 Max", "cpu_cores": 18, "gpu_cores": 32 },
+        { "name": "M5 Max", "cpu_cores": 18, "gpu_cores": 40 }
+      ],
+      "memory_gb": [24, 36, 48, 64, 128],
+      "storage_gb_from": { "M5 Pro": 1024, "M5 Max": 2048 },
+      "colors": ["Space Black", "Silver"],
+      "connectivity": ["3x Thunderbolt 5", "HDMI", "SDXC card slot", "MagSafe 3", "3.5mm headphone jack", "N1 (Wi-Fi 7, Bluetooth 6)"]
+    }
+  ]
+}
