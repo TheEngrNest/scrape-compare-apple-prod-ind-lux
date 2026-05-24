@@ -1,0 +1,12 @@
+# Scraper outputs (timestamped runs) and debug dumps
+output/
+*.debug.html
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Playwright
+.cache/
