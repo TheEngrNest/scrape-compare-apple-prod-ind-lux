@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lumina · a small calm corner of the web</title>
+<meta name="description" content="Lumina — an interactive constellation, focus timer, breathing guide and generative ambient sound. One file. No install. Just open it." />
+<style>
+  :root {
+    --bg-0: #05060f;
+    --bg-1: #0b1027;
+    --ink: #e8ecff;
+    --ink-soft: #9aa3c9;
+    --accent: #7aa2ff;
+    --accent-2: #b388ff;
+    --ring-track: rgba(255,255,255,.08);
+    --glass: rgba(255,255,255,.05);
+    --glass-line: rgba(255,255,255,.12);
+    --shadow: 0 20px 60px rgba(0,0,0,.45);
+    --ease: cubic-bezier(.22,.61,.36,1);
+  }
+
+  /* ---- Themes ---- */
+  body[data-theme="aurora"]  { --accent:#7aa2ff; --accent-2:#7df0c8; --bg-1:#071425; }
+  body[data-theme="ember"]   { --accent:#ff9d6c; --accent-2:#ff5e8a; --bg-1:#1b0a13; }
+  body[data-theme="forest"]  { --accent:#8be0a4; --accent-2:#d6f08a; --bg-1:#07160f; }
+  body[data-theme="mono"]    { --accent:#c7cce8; --accent-2:#8a90b8; --bg-1:#0c0d14; }
+  body[data-theme="violet"]  { --accent:#b388ff; --accent-2:#7aa2ff; --bg-1:#120a24; }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: ui-rounded, "SF Pro Rounded", "Segoe UI", system-ui, -apple-system, sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(1200px 800px at 80% -10%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%),
+      radial-gradient(1000px 700px at -10% 110%, color-mix(in srgb, var(--accent-2) 12%, transparent), transparent 60%),
+      linear-gradient(160deg, var(--bg-1), var(--bg-0));
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    transition: background 1.2s var(--ease);
+  }
+
+  canvas#sky { position: fixed; inset: 0; z-index: 0; display: block; }
+
+  .stage {
+    position: relative; z-index: 1;
+    height: 100%; width: 100%;
+    display: grid; place-items: center;
+    padding: 24px;
+  }
+
+  .card {
+    width: min(560px, 92vw);
+    background: var(--glass);
+    border: 1px solid var(--glass-line);
+    border-radius: 28px;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    padding: 28px clamp(18px, 4vw, 34px) 26px;
+    text-align: center;
+    transition: transform .6s var(--ease), opacity .6s var(--ease);
+  }
+
+  .brand {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    letter-spacing: .14em; text-transform: uppercase;
+    font-size: 12px; color: var(--ink-soft);
+  }
+  .brand .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 14px var(--accent);
+    animation: pulse 3.2s var(--ease) infinite;
+  }
+  @keyframes pulse { 0%,100%{transform:scale(1);opacity:.8} 50%{transform:scale(1.5);opacity:1} }
+
+  .mode-label { margin: 14px 0 2px; font-size: 14px; color: var(--ink-soft); }
+  .greeting { margin: 0 0 6px; font-weight: 500; font-size: 15px; color: var(--ink); opacity:.9 }
+
+  /* ---- Timer ring ---- */
+  .ring-wrap { position: relative; width: 260px; height: 260px; margin: 6px auto 4px; }
+  svg.ring { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring .track { fill: none; stroke: var(--ring-track); stroke-width: 10; }
+  .ring .prog {
+    fill: none; stroke: url(#grad); stroke-width: 10; stroke-linecap: round;
+    transition: stroke-dashoffset .9s linear;
+    filter: drop-shadow(0 0 8px color-mix(in srgb, var(--accent) 60%, transparent));
+  }
+  .time {
+    position: absolute; inset: 0; display: grid; place-content: center; gap: 2px;
+  }
+  .time .clock {
+    font-variant-numeric: tabular-nums; font-weight: 600;
+    font-size: 58px; line-height: 1; letter-spacing: .02em;
+  }
+  .time .sub { font-size: 12px; color: var(--ink-soft); letter-spacing:.18em; text-transform:uppercase }
+
+  /* ---- Controls ---- */
+  .controls { display: flex; gap: 10px; justify-content: center; margin-top: 18px; flex-wrap: wrap; }
+  button {
+    font: inherit; color: var(--ink); cursor: pointer;
+    border: 1px solid var(--glass-line);
+    background: var(--glass);
+    padding: 11px 18px; border-radius: 14px;
+    transition: transform .15s var(--ease), background .25s, border-color .25s;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  button:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--accent) 60%, var(--glass-line)); }
+  button:active { transform: translateY(0) scale(.98); }
+  button.primary {
+    background: linear-gradient(120deg, var(--accent), var(--accent-2));
+    color: #06070f; font-weight: 600; border: none;
+    box-shadow: 0 10px 30px color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+  button.icon { padding: 11px 13px; }
+
+  .modes { display: flex; gap: 8px; justify-content: center; margin-top: 16px; }
+  .chip {
+    font-size: 13px; padding: 7px 14px; border-radius: 999px;
+    border: 1px solid var(--glass-line); background: transparent; color: var(--ink-soft);
+  }
+  .chip[aria-pressed="true"] {
+    color: var(--ink); border-color: color-mix(in srgb, var(--accent) 70%, transparent);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+
+  .footer {
+    margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--glass-line);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  }
+  .stat { text-align: left; }
+  .stat b { font-size: 20px; }
+  .stat span { display:block; font-size: 11px; color: var(--ink-soft); letter-spacing:.12em; text-transform:uppercase }
+  .toolbar { display: flex; gap: 8px; }
+
+  /* ---- Breathing overlay ---- */
+  .breathe {
+    position: fixed; inset: 0; z-index: 5; display: none;
+    place-items: center; background: rgba(3,4,12,.72);
+    backdrop-filter: blur(6px);
+  }
+  .breathe.on { display: grid; }
+  .orb {
+    width: 200px; height: 200px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--accent-2) 90%, white), var(--accent));
+    box-shadow: 0 0 80px color-mix(in srgb, var(--accent) 60%, transparent);
+    display: grid; place-items: center; color:#05060f; font-weight:600; letter-spacing:.08em;
+    animation: breathe 11s var(--ease) infinite;
+  }
+  @keyframes breathe {
+    0%   { transform: scale(.7); }   /* inhale start */
+    36%  { transform: scale(1.18); } /* hold (4s in) */
+    63%  { transform: scale(1.18); } /* hold */
+    100% { transform: scale(.7); }   /* exhale */
+  }
+  .breathe .hint { position: absolute; bottom: 12%; color: var(--ink-soft); font-size: 13px; letter-spacing:.16em; text-transform:uppercase }
+
+  /* ---- Intentions / toast ---- */
+  .intent {
+    margin: 2px auto 0; max-width: 80%;
+    font-size: 14px; color: var(--ink); opacity: .92; min-height: 20px;
+  }
+  .intent input {
+    width: 100%; text-align: center; background: transparent; border: none;
+    color: var(--ink); font: inherit; font-size: 14px; outline: none;
+    border-bottom: 1px dashed transparent; padding: 4px 2px;
+  }
+  .intent input::placeholder { color: var(--ink-soft); }
+  .intent input:focus { border-bottom-color: color-mix(in srgb, var(--accent) 60%, transparent); }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(20px);
+    background: var(--glass); border: 1px solid var(--glass-line); backdrop-filter: blur(12px);
+    padding: 12px 18px; border-radius: 14px; color: var(--ink); font-size: 14px;
+    opacity: 0; pointer-events: none; transition: all .4s var(--ease); z-index: 9;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .hint-keys { position: fixed; bottom: 12px; right: 16px; z-index: 2; font-size: 11px; color: var(--ink-soft); opacity:.6 }
+  .hint-keys kbd {
+    font-family: inherit; background: var(--glass); border: 1px solid var(--glass-line);
+    border-radius: 6px; padding: 1px 6px; margin: 0 1px;
+  }
+
+  @media (max-width: 420px) {
+    .ring-wrap { width: 220px; height: 220px; }
+    .time .clock { font-size: 48px; }
+    .hint-keys { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .orb { animation-duration: 0s; }
+    .brand .dot { animation: none; }
+  }
+</style>
+</head>
+<body data-theme="aurora">
+  <canvas id="sky"></canvas>
+
+  <div class="stage">
+    <main class="card" id="card">
+      <div class="brand"><span class="dot"></span> Lumina</div>
+      <p class="greeting" id="greeting">Hello.</p>
+
+      <div class="mode-label" id="modeLabel">Focus</div>
+
+      <div class="ring-wrap">
+        <svg class="ring" viewBox="0 0 120 120">
+          <defs>
+            <linearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%"  stop-color="var(--accent)" />
+              <stop offset="100%" stop-color="var(--accent-2)" />
+            </linearGradient>
+          </defs>
+          <circle class="track" cx="60" cy="60" r="54" />
+          <circle class="prog"  cx="60" cy="60" r="54" id="prog" />
+        </svg>
+        <div class="time">
+          <div class="clock" id="clock">25:00</div>
+          <div class="sub" id="sub">ready</div>
+        </div>
+      </div>
+
+      <div class="intent">
+        <input id="intent" type="text" maxlength="60" placeholder="what are you focusing on? (optional)" />
+      </div>
+
+      <div class="modes" role="group" aria-label="Session length">
+        <button class="chip" data-min="25" aria-pressed="true">Focus 25</button>
+        <button class="chip" data-min="50" aria-pressed="false">Deep 50</button>
+        <button class="chip" data-min="5"  aria-pressed="false">Break 5</button>
+      </div>
+
+      <div class="controls">
+        <button class="primary" id="startBtn">▶ Start</button>
+        <button id="resetBtn">↺ Reset</button>
+        <button class="icon" id="breatheBtn" title="Breathing guide (B)">🌬️</button>
+        <button class="icon" id="soundBtn" title="Ambient sound (M)">🔇</button>
+        <button class="icon" id="themeBtn" title="Theme (T)">🎨</button>
+      </div>
+
+      <div class="footer">
+        <div class="stat">
+          <b id="doneCount">0</b>
+          <span>sessions today</span>
+        </div>
+        <div class="stat">
+          <b id="streak">0</b>
+          <span>day streak</span>
+        </div>
+        <div class="toolbar">
+          <button class="icon" id="fsBtn" title="Fullscreen (F)">⤢</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="breathe" id="breathe">
+    <div class="orb" id="orb">breathe</div>
+    <div class="hint">tap anywhere to close · inhale 4 · hold 3 · exhale 4</div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="hint-keys">
+    <kbd>Space</kbd> start/pause · <kbd>B</kbd> breathe · <kbd>M</kbd> sound · <kbd>T</kbd> theme · <kbd>F</kbd> full
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (s) => document.querySelector(s);
+  const store = {
+    get(k, d) { try { return JSON.parse(localStorage.getItem("lumina." + k)) ?? d; } catch { return d; } },
+    set(k, v) { try { localStorage.setItem("lumina." + k, JSON.stringify(v)); } catch {} }
+  };
+
+  /* ---------------------------------------------------------------------- */
+  /*  Constellation canvas                                                  */
+  /* ---------------------------------------------------------------------- */
+  const cv = $("#sky"), ctx = cv.getContext("2d");
+  let W, H, DPR, stars = [], mouse = { x: -999, y: -999 }, energy = 0;
+  const STAR_COUNT = () => Math.min(150, Math.floor((W * H) / 14000));
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = cv.clientWidth = window.innerWidth;
+    H = cv.clientHeight = window.innerHeight;
+    cv.width = W * DPR; cv.height = H * DPR;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    seed();
+  }
+  function seed() {
+    stars = Array.from({ length: STAR_COUNT() }, () => ({
+      x: Math.random() * W, y: Math.random() * H,
+      vx: (Math.random() - .5) * .18, vy: (Math.random() - .5) * .18,
+      r: Math.random() * 1.6 + .4, tw: Math.random() * Math.PI * 2
+    }));
+  }
+  function accent() {
+    return getComputedStyle(document.body).getPropertyValue("--accent").trim() || "#7aa2ff";
+  }
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    const col = accent();
+    const link = 120 + energy * 50;
+    // update + draw stars
+    for (const s of stars) {
+      s.x += s.vx * (1 + energy); s.y += s.vy * (1 + energy);
+      if (s.x < 0) s.x = W; if (s.x > W) s.x = 0;
+      if (s.y < 0) s.y = H; if (s.y > H) s.y = 0;
+      // gentle pull toward mouse
+      const dx = mouse.x - s.x, dy = mouse.y - s.y, d2 = dx * dx + dy * dy;
+      if (d2 < 26000) { s.x += dx * .0009; s.y += dy * .0009; }
+      s.tw += .03;
+      const a = .5 + Math.sin(s.tw) * .35;
+      ctx.beginPath();
+      ctx.fillStyle = hexA(col, a);
+      ctx.arc(s.x, s.y, s.r, 0, 7);
+      ctx.fill();
+    }
+    // links
+    for (let i = 0; i < stars.length; i++) {
+      for (let j = i + 1; j < stars.length; j++) {
+        const a = stars[i], b = stars[j];
+        const dx = a.x - b.x, dy = a.y - b.y, dist = Math.hypot(dx, dy);
+        if (dist < link) {
+          ctx.strokeStyle = hexA(col, (1 - dist / link) * .18);
+          ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        }
+      }
+      // link to cursor
+      const dx = stars[i].x - mouse.x, dy = stars[i].y - mouse.y, dm = Math.hypot(dx, dy);
+      if (dm < 160) {
+        ctx.strokeStyle = hexA(col, (1 - dm / 160) * .35);
+        ctx.beginPath(); ctx.moveTo(stars[i].x, stars[i].y); ctx.lineTo(mouse.x, mouse.y); ctx.stroke();
+      }
+    }
+    energy *= .96;
+    requestAnimationFrame(draw);
+  }
+  function hexA(hex, a) {
+    hex = hex.replace("#", "");
+    if (hex.length === 3) hex = hex.split("").map(c => c + c).join("");
+    const n = parseInt(hex, 16);
+    return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a.toFixed(3)})`;
+  }
+  window.addEventListener("resize", resize);
+  window.addEventListener("pointermove", e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+  window.addEventListener("pointerdown", () => { energy = Math.min(energy + .6, 2); });
+  resize(); draw();
+
+  /* ---------------------------------------------------------------------- */
+  /*  Timer                                                                 */
+  /* ---------------------------------------------------------------------- */
+  const R = 54, CIRC = 2 * Math.PI * R;
+  const prog = $("#prog");
+  prog.style.strokeDasharray = CIRC;
+  prog.style.strokeDashoffset = 0;
+
+  let total = 25 * 60, remaining = total, running = false, ticker = null, isBreak = false;
+
+  const clockEl = $("#clock"), subEl = $("#sub"), modeLabel = $("#modeLabel");
+
+  function fmt(s) {
+    const m = Math.floor(s / 60), ss = s % 60;
+    return `${String(m).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
+  }
+  function render() {
+    clockEl.textContent = fmt(remaining);
+    const frac = total ? remaining / total : 0;
+    prog.style.strokeDashoffset = CIRC * (1 - frac);
+    document.title = (running ? "▶ " : "") + fmt(remaining) + " · Lumina";
+  }
+  function setMode(min, breakMode) {
+    pause();
+    isBreak = !!breakMode;
+    total = remaining = min * 60;
+    modeLabel.textContent = isBreak ? "Break" : (min >= 50 ? "Deep Work" : "Focus");
+    subEl.textContent = "ready";
+    energy = .8;
+    render();
+  }
+  function start() {
+    if (running) return pause();
+    running = true;
+    $("#startBtn").innerHTML = "⏸ Pause";
+    subEl.textContent = isBreak ? "resting" : "in flow";
+    sound.swell();
+    ticker = setInterval(() => {
+      remaining--;
+      energy = Math.max(energy, .15);
+      if (remaining <= 0) { complete(); return; }
+      render();
+    }, 1000);
+  }
+  function pause() {
+    running = false;
+    clearInterval(ticker);
+    $("#startBtn").innerHTML = "▶ Start";
+    if (remaining > 0 && remaining < total) subEl.textContent = "paused";
+    render();
+  }
+  function reset() { pause(); remaining = total; subEl.textContent = "ready"; render(); }
+
+  function complete() {
+    clearInterval(ticker); running = false;
+    remaining = 0; render();
+    $("#startBtn").innerHTML = "▶ Start";
+    subEl.textContent = "done ✓";
+    energy = 2;
+    sound.chime();
+    burst();
+    if (!isBreak) {
+      const today = new Date().toDateString();
+      let d = store.get("daily", { date: today, count: 0 });
+      if (d.date !== today) d = { date: today, count: 0 };
+      d.count++; store.set("daily", d);
+      bumpStreak();
+      const intent = $("#intent").value.trim();
+      toast(intent ? `Nice — “${intent}” complete.` : "Session complete. Well done. 🌟");
+    } else {
+      toast("Break over — ready when you are.");
+    }
+    refreshStats();
+    setTimeout(() => { remaining = total; subEl.textContent = "ready"; render(); }, 2600);
+  }
+
+  function bumpStreak() {
+    const today = new Date().toDateString();
+    const yest = new Date(Date.now() - 864e5).toDateString();
+    let s = store.get("streak", { last: null, n: 0 });
+    if (s.last === today) { /* already counted */ }
+    else if (s.last === yest) { s.n++; s.last = today; }
+    else { s.n = 1; s.last = today; }
+    store.set("streak", s);
+  }
+  function refreshStats() {
+    const today = new Date().toDateString();
+    const d = store.get("daily", { date: today, count: 0 });
+    $("#doneCount").textContent = d.date === today ? d.count : 0;
+    const s = store.get("streak", { last: null, n: 0 });
+    const valid = s.last === today || s.last === new Date(Date.now() - 864e5).toDateString();
+    $("#streak").textContent = valid ? s.n : 0;
+  }
+
+  /* ---- celebratory particle burst ---- */
+  function burst() {
+    const col = accent();
+    const parts = Array.from({ length: 60 }, () => {
+      const ang = Math.random() * Math.PI * 2, sp = Math.random() * 6 + 2;
+      return { x: W / 2, y: H / 2, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, life: 1 };
+    });
+    (function anim() {
+      let alive = false;
+      for (const p of parts) {
+        if (p.life <= 0) continue;
+        alive = true;
+        p.x += p.vx; p.y += p.vy; p.vy += .06; p.life -= .015;
+        ctx.beginPath(); ctx.fillStyle = hexA(col, Math.max(0, p.life));
+        ctx.arc(p.x, p.y, 2.4, 0, 7); ctx.fill();
+      }
+      if (alive) requestAnimationFrame(anim);
+    })();
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /*  Generative ambient sound (Web Audio — no files)                       */
+  /* ---------------------------------------------------------------------- */
+  const sound = (() => {
+    let actx = null, master = null, on = false, nodes = [];
+    const SCALE = [220.00, 246.94, 293.66, 329.63, 392.00, 440.00]; // A minor pentatonic-ish
+
+    function ensure() {
+      if (actx) return;
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+      master = actx.createGain();
+      master.gain.value = 0.0001;
+      master.connect(actx.destination);
+    }
+    function pad() {
+      // soft evolving drone
+      const base = actx.createOscillator(), b2 = actx.createOscillator();
+      const g = actx.createGain(), filt = actx.createBiquadFilter();
+      base.type = "sine"; b2.type = "triangle";
+      base.frequency.value = 110; b2.frequency.value = 110 * 1.5;
+      filt.type = "lowpass"; filt.frequency.value = 600;
+      g.gain.value = .18;
+      base.connect(g); b2.connect(g); g.connect(filt); filt.connect(master);
+      base.start(); b2.start();
+      // slow LFO on filter
+      const lfo = actx.createOscillator(), lg = actx.createGain();
+      lfo.frequency.value = .05; lg.gain.value = 220;
+      lfo.connect(lg); lg.connect(filt.frequency); lfo.start();
+      nodes.push(base, b2, lfo);
+    }
+    function pluck() {
+      if (!on || !actx) return;
+      const f = SCALE[Math.floor(Math.random() * SCALE.length)] * (Math.random() < .3 ? 2 : 1);
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = "sine"; o.frequency.value = f;
+      const t = actx.currentTime;
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(.12, t + .02);
+      g.gain.exponentialRampToValueAtTime(.0001, t + 2.4);
+      o.connect(g); g.connect(master); o.start(t); o.stop(t + 2.6);
+      // schedule next
+      setTimeout(pluck, 1400 + Math.random() * 2600);
+    }
+    function toggle() {
+      ensure();
+      if (actx.state === "suspended") actx.resume();
+      on = !on;
+      const t = actx.currentTime;
+      master.gain.cancelScheduledValues(t);
+      master.gain.setValueAtTime(master.gain.value, t);
+      master.gain.linearRampToValueAtTime(on ? .5 : .0001, t + 1.2);
+      if (on && nodes.length === 0) { pad(); pluck(); }
+      $("#soundBtn").textContent = on ? "🔊" : "🔇";
+      return on;
+    }
+    function swell() {
+      if (!on || !actx) return;
+      const t = actx.currentTime;
+      master.gain.linearRampToValueAtTime(.6, t + .8);
+      master.gain.linearRampToValueAtTime(.5, t + 2.4);
+    }
+    function chime() {
+      ensure();
+      const notes = [523.25, 659.25, 783.99, 1046.5];
+      notes.forEach((f, i) => {
+        const o = actx.createOscillator(), g = actx.createGain();
+        o.type = "sine"; o.frequency.value = f;
+        const t = actx.currentTime + i * .12;
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(.25, t + .03);
+        g.gain.exponentialRampToValueAtTime(.0001, t + 1.6);
+        o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + 1.7);
+      });
+    }
+    return { toggle, swell, chime, isOn: () => on };
+  })();
+
+  /* ---------------------------------------------------------------------- */
+  /*  Themes                                                                */
+  /* ---------------------------------------------------------------------- */
+  const THEMES = ["aurora", "violet", "ember", "forest", "mono"];
+  function cycleTheme() {
+    const cur = document.body.dataset.theme;
+    const next = THEMES[(THEMES.indexOf(cur) + 1) % THEMES.length];
+    document.body.dataset.theme = next;
+    store.set("theme", next);
+    energy = 1;
+    toast("Theme · " + next);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /*  Breathing                                                             */
+  /* ---------------------------------------------------------------------- */
+  const breatheEl = $("#breathe"), orb = $("#orb");
+  let breathePhase = null;
+  function toggleBreathe() {
+    const open = !breatheEl.classList.contains("on");
+    breatheEl.classList.toggle("on", open);
+    if (open) {
+      const phases = [["breathe in", 4000], ["hold", 3000], ["breathe out", 4000]];
+      let i = 0;
+      const step = () => {
+        if (!breatheEl.classList.contains("on")) return;
+        orb.textContent = phases[i][0];
+        const wait = phases[i][1];
+        i = (i + 1) % phases.length;
+        breathePhase = setTimeout(step, wait);
+      };
+      step();
+    } else if (breathePhase) clearTimeout(breathePhase);
+  }
+  breatheEl.addEventListener("click", toggleBreathe);
+
+  /* ---------------------------------------------------------------------- */
+  /*  Misc UI                                                               */
+  /* ---------------------------------------------------------------------- */
+  let toastTimer = null;
+  function toast(msg) {
+    const t = $("#toast");
+    t.textContent = msg; t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove("show"), 3200);
+  }
+  function greeting() {
+    const h = new Date().getHours();
+    const g = h < 5 ? "Burning the midnight oil?" :
+              h < 12 ? "Good morning." :
+              h < 17 ? "Good afternoon." :
+              h < 22 ? "Good evening." : "Winding down?";
+    $("#greeting").textContent = g + " Take a breath, then begin.";
+  }
+  function toggleFs() {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+    else document.exitFullscreen?.();
+  }
+
+  // chips
+  document.querySelectorAll(".chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      document.querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", "false"));
+      chip.setAttribute("aria-pressed", "true");
+      const min = +chip.dataset.min;
+      setMode(min, min === 5);
+    });
+  });
+
+  $("#startBtn").addEventListener("click", start);
+  $("#resetBtn").addEventListener("click", reset);
+  $("#breatheBtn").addEventListener("click", toggleBreathe);
+  $("#soundBtn").addEventListener("click", () => sound.toggle());
+  $("#themeBtn").addEventListener("click", cycleTheme);
+  $("#fsBtn").addEventListener("click", toggleFs);
+
+  // keyboard
+  window.addEventListener("keydown", e => {
+    if (e.target.tagName === "INPUT") { if (e.key === "Enter") e.target.blur(); return; }
+    const k = e.key.toLowerCase();
+    if (e.code === "Space") { e.preventDefault(); start(); }
+    else if (k === "b") toggleBreathe();
+    else if (k === "m") sound.toggle();
+    else if (k === "t") cycleTheme();
+    else if (k === "f") toggleFs();
+    else if (k === "r") reset();
+  });
+
+  // persist intent text
+  const intentInput = $("#intent");
+  intentInput.value = store.get("intent", "");
+  intentInput.addEventListener("input", () => store.set("intent", intentInput.value));
+
+  // restore theme
+  const savedTheme = store.get("theme", "aurora");
+  if (THEMES.includes(savedTheme)) document.body.dataset.theme = savedTheme;
+
+  greeting();
+  refreshStats();
+  render();
+})();
+</script>
+</body>
+</html>
